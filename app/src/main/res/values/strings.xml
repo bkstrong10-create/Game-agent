@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI Game Agent</string>
+    <string name="accessibility_description">Allows AI to see your screen and perform taps/swipes to play games automatically.</string>
+</resources>
