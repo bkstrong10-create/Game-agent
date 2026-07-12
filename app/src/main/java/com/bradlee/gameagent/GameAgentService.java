@@ -207,6 +207,11 @@ public class GameAgentService extends AccessibilityService {
                             .getJSONObject(0).getString("text")
                             .trim().replace("```json","").replace("```","").trim();
 
+                        // Extract JSON even if Claude wraps in text
+                        int js = raw.indexOf('{');
+                        int je = raw.lastIndexOf('}');
+                        if (js >= 0 && je > js) raw = raw.substring(js, je + 1);
+
                         log("RUNNING", "Action: " + raw);
                         JSONObject action = new JSONObject(raw);
 
