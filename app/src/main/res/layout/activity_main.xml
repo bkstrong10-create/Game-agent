@@ -11,29 +11,31 @@
         android:orientation="vertical">
 
         <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="AI Game Agent"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="4dp"/>
+            android:textColor="#FFFFFF" android:textSize="22sp" android:textStyle="bold"
+            android:layout_marginBottom="2dp"/>
 
-        <TextView
-            android:id="@+id/tvStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="NOT CONNECTED"
-            android:textColor="#FF9800"
-            android:textSize="13sp"
-            android:layout_marginBottom="18dp"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="16dp">
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="NOT CONNECTED" android:textColor="#FF9800" android:textSize="13sp"/>
+            <TextView
+                android:id="@+id/tvCost"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="$0.0000 • Step 0"
+                android:textColor="#555555" android:textSize="11sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
 
         <Button
             android:id="@+id/btnAccessibility"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_width="match_parent" android:layout_height="48dp"
             android:text="Enable Accessibility Service"
-            android:layout_marginBottom="18dp"/>
+            android:layout_marginBottom="16dp"/>
 
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Anthropic API Key" android:textColor="#AAAAAA" android:textSize="11sp"/>
@@ -43,33 +45,63 @@
             android:hint="sk-ant-..." android:inputType="textPassword"
             android:textColor="#FFFFFF" android:textColorHint="#444444"
             android:padding="12dp" android:background="#181818"
-            android:layout_marginBottom="14dp"/>
+            android:layout_marginBottom="12dp"/>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="14dp">
+            <Button
+                android:id="@+id/btnSaveProfile"
+                android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1"
+                android:text="Save Profile" android:textSize="12sp"/>
+            <Button
+                android:id="@+id/btnLoadProfile"
+                android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1"
+                android:text="Load Profile" android:textSize="12sp"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Game Name" android:textColor="#AAAAAA" android:textSize="11sp"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="14dp">
+            <EditText
+                android:id="@+id/etGameName"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:hint="e.g. Klondike Solitaire, 2048, Candy Crush"
+                android:inputType="text"
+                android:textColor="#FFFFFF" android:textColorHint="#444444"
+                android:padding="12dp" android:background="#181818"/>
+            <Button
+                android:id="@+id/btnGenerate"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Generate" android:layout_marginStart="8dp"/>
+        </LinearLayout>
 
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Game Context" android:textColor="#AAAAAA" android:textSize="11sp"/>
         <EditText
             android:id="@+id/etGameContext"
             android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="I am playing [game]. Goal: [describe]. Tips: [strategy hints]"
+            android:hint="Type a game name above and tap Generate"
             android:inputType="textMultiLine" android:minLines="4" android:gravity="top|start"
             android:textColor="#FFFFFF" android:textColorHint="#444444"
             android:padding="12dp" android:background="#181818"
-            android:layout_marginBottom="14dp"/>
+            android:layout_marginBottom="12dp"/>
 
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Delay between actions (ms)" android:textColor="#AAAAAA" android:textSize="11sp"/>
         <EditText
             android:id="@+id/etDelay"
             android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="2000" android:inputType="number"
+            android:text="2500" android:inputType="number"
             android:textColor="#FFFFFF" android:padding="12dp"
-            android:background="#181818" android:layout_marginBottom="20dp"/>
+            android:background="#181818" android:layout_marginBottom="18dp"/>
 
         <Button
             android:id="@+id/btnStartStop"
             android:layout_width="match_parent" android:layout_height="56dp"
             android:text="START AGENT" android:textSize="15sp"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="14dp"/>
 
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Log" android:textColor="#AAAAAA" android:textSize="11sp"/>
