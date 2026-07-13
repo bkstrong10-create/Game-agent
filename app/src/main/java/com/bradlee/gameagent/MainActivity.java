@@ -163,16 +163,24 @@ public class MainActivity extends AppCompatActivity {
             + "Keep it under 200 words. Be specific and actionable.\n"
             + "End with: Output ONLY JSON. No text before or after.";
 
+        final String reqBody;
+        try {
+            reqBody = new JSONObject()
+                .put("model","claude-sonnet-4-6").put("max_tokens",400)
+                .put("messages", new JSONArray().put(new JSONObject()
+                    .put("role","user").put("content", prompt)))
+                .toString();
+        } catch (Exception e) {
+            etGameContext.setText("Error building request: " + e.getMessage());
+            resetGen();
+            return;
+        }
         new OkHttpClient.Builder().connectTimeout(15,TimeUnit.SECONDS).readTimeout(30,TimeUnit.SECONDS).build()
             .newCall(new Request.Builder()
                 .url("https://api.anthropic.com/v1/messages")
                 .header("x-api-key", key).header("anthropic-version","2023-06-01")
                 .header("content-type","application/json")
-                .post(RequestBody.create(new JSONObject()
-                    .put("model","claude-sonnet-4-6").put("max_tokens",400)
-                    .put("messages", new JSONArray().put(new JSONObject()
-                        .put("role","user").put("content", prompt)))
-                    .toString(), MediaType.get("application/json")))
+                .post(RequestBody.create(reqBody, MediaType.get("application/json")))
                 .build())
             .enqueue(new Callback() {
                 @Override public void onFailure(Call c, IOException e) {

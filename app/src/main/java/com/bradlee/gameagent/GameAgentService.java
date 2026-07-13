@@ -112,7 +112,7 @@ public class GameAgentService extends AccessibilityService {
         lastActionKey = ""; stuckCount = 0; lastScreenHash = "";
         actionHistory.clear();
         log("RUNNING", "Agent started — budget limit $" + String.format("%.2f", budgetLimitUsd));
-        notify("Starting...");
+        pushNotif("Starting...");
         scheduleStep(1000);
     }
 
@@ -270,7 +270,7 @@ public class GameAgentService extends AccessibilityService {
                         if (actionHistory.size() > MAX_HISTORY) actionHistory.removeFirst();
 
                         log("RUNNING", String.format("[%s] %s  $%.4f", type, raw, totalCost));
-                        notify(String.format("Step %d • $%.4f", stepCount, totalCost));
+                        pushNotif(String.format("Step %d • $%.4f", stepCount, totalCost));
 
                         mainHandler.post(() -> dispatch(action, type));
 
@@ -392,7 +392,7 @@ public class GameAgentService extends AccessibilityService {
         catch (Exception e) { return String.valueOf(d.length); }
     }
 
-    private void notify(String text) {
+    private void pushNotif(String text) {
         if (nm == null) return;
         try {
             Intent open = new Intent(this,MainActivity.class);
