@@ -48,9 +48,11 @@ public class GameAgentService extends AccessibilityService {
     private static final double COST_OUT   = 15.0 / 1_000_000.0;
     private static final int    STUCK_LIMIT  = 3;
     private static final int    MAX_HISTORY  = 5;
-    // Image optimization: 35% scale, quality 65 saves ~60% vs 50%/75%
-    private static final float  IMG_SCALE  = 0.35f;
-    private static final int    IMG_QUALITY = 65;
+    // Higher-resolution image improves card/rank recognition.
+    // Coordinates returned by Claude are normalized (0-1000), so image scaling
+    // no longer changes where Android taps.
+    private static final float  IMG_SCALE  = 0.50f;
+    private static final int    IMG_QUALITY = 72;
 
     // Static fields accessed by MainActivity
     public static GameAgentService instance;
@@ -75,6 +77,10 @@ public class GameAgentService extends AccessibilityService {
     private       String   lastActionKey  = "";
     private       int      stuckCount     = 0;
     private       String   lastScreenHash = "";
+    // Exact full-resolution screenshot size. Accessibility gestures use this
+    // same coordinate space, including status/navigation bars.
+    private       int      captureWidth   = 1;
+    private       int      captureHeight  = 1;
 
     private final SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.US);
 
@@ -151,8 +157,11 @@ public class GameAgentService extends AccessibilityService {
                 Bitmap sw2 = hw.copy(Bitmap.Config.ARGB_8888, false);
                 hw.recycle(); hb.close();
 
-                int W = (int)(sw2.getWidth()  * IMG_SCALE);
-                int H = (int)(sw2.getHeight() * IMG_SCALE);
+                captureWidth  = Math.max(1, sw2.getWidth());
+                captureHeight = Math.max(1, sw2.getHeight());
+
+                int W = Math.max(1, (int)(captureWidth  * IMG_SCALE));
+                int H = Math.max(1, (int)(captureHeight * IMG_SCALE));
                 Bitmap small = Bitmap.createScaledBitmap(sw2, W, H, true);
                 sw2.recycle();
 
@@ -184,15 +193,13 @@ public class GameAgentService extends AccessibilityService {
     // Uses prompt caching on system prompt (free after 1st call within 5 min window)
 
     private void callClaude(String b64, int imgW, int imgH) {
-        int screenW = getResources().getDisplayMetrics().widthPixels;
-        int screenH = getResources().getDisplayMetrics().heightPixels;
         try {
             // System prompt with cache_control for prompt caching
             // Reduces cost after first call — system prompt tokens become free
             JSONArray systemArr = new JSONArray();
             systemArr.put(new JSONObject()
                 .put("type", "text")
-                .put("text", buildSystemPrompt(screenW, screenH))
+                .put("text", buildSystemPrompt())
                 .put("cache_control", new JSONObject().put("type", "ephemeral")));
 
             JSONObject msg = new JSONObject()
@@ -201,7 +208,7 @@ public class GameAgentService extends AccessibilityService {
                     .put(new JSONObject().put("type","image").put("source", new JSONObject()
                         .put("type","base64").put("media_type","image/jpeg").put("data",b64)))
                     .put(new JSONObject().put("type","text")
-                        .put("text","Screen is " + imgW + "x" + imgH + "px (scaled). What action next?")));
+                        .put("text","Choose the next move. Return coordinates only in normalized 0-1000 space for the entire screenshot.")));
 
             JSONObject payload = new JSONObject()
                 .put("model", "claude-sonnet-4-6")
@@ -259,9 +266,11 @@ public class GameAgentService extends AccessibilityService {
                         JSONObject action = new JSONObject(raw);
                         String type = action.optString("action","tap");
 
-                        // Stuck detection (round coords to 40px grid)
-                        String aKey = type + ":" + action.optInt("x",0)/40
-                                           + ":" + action.optInt("y",0)/40;
+                        // Stuck detection in normalized coordinate space.
+                        // readNumber also accepts accidental numeric strings such as "722".
+                        int keyX = (int)Math.round(readNumber(action, "x", 0) / 25.0);
+                        int keyY = (int)Math.round(readNumber(action, "y", 0) / 25.0);
+                        String aKey = type + ":" + keyX + ":" + keyY;
                         if (aKey.equals(lastActionKey)) stuckCount++;
                         else { stuckCount = 0; lastActionKey = aKey; }
 
@@ -320,12 +329,10 @@ public class GameAgentService extends AccessibilityService {
     private void handleRestart(JSONObject action) {
         try {
             gameCount++;
-            int sw = getResources().getDisplayMetrics().widthPixels;
-            int sh = getResources().getDisplayMetrics().heightPixels;
             JSONObject tap = new JSONObject()
                 .put("action","tap")
-                .put("x", action.optInt("x", sw/2))
-                .put("y", action.optInt("y", sh/2));
+                .put("x", action.has("x") ? action.get("x") : 500)
+                .put("y", action.has("y") ? action.get("y") : 500);
             execute(tap);
             actionHistory.clear();
             lastActionKey = ""; stuckCount = 0; lastScreenHash = "";
@@ -340,37 +347,110 @@ public class GameAgentService extends AccessibilityService {
             GestureDescription.Builder b = new GestureDescription.Builder();
             switch (t) {
                 case "tap": {
-                    float x=(float)action.getDouble("x"), y=(float)action.getDouble("y");
-                    Path p=new Path(); p.moveTo(x,y);
-                    b.addStroke(new GestureDescription.StrokeDescription(p,0,60));
-                    dispatchGesture(b.build(),null,null); break;
+                    double nx = readNumber(action, "x", 500);
+                    double ny = readNumber(action, "y", 500);
+                    float x = normalizedX(nx);
+                    float y = normalizedY(ny);
+                    Path p = new Path();
+                    p.moveTo(x, y);
+                    b.addStroke(new GestureDescription.StrokeDescription(p, 0, 80));
+                    dispatchLoggedGesture(b.build(),
+                        String.format(Locale.US,
+                            "TAP norm(%.0f,%.0f) -> px(%.0f,%.0f) screen=%dx%d",
+                            nx, ny, x, y, captureWidth, captureHeight));
+                    break;
                 }
                 case "swipe": {
-                    float x1=(float)action.getDouble("x1"),y1=(float)action.getDouble("y1");
-                    float x2=(float)action.getDouble("x2"),y2=(float)action.getDouble("y2");
-                    long  dur = action.optLong("duration",350);
-                    Path p=new Path(); p.moveTo(x1,y1); p.lineTo(x2,y2);
-                    b.addStroke(new GestureDescription.StrokeDescription(p,0,dur));
-                    dispatchGesture(b.build(),null,null); break;
+                    double nx1 = readNumber(action, "x1", 500);
+                    double ny1 = readNumber(action, "y1", 500);
+                    double nx2 = readNumber(action, "x2", 500);
+                    double ny2 = readNumber(action, "y2", 500);
+                    float x1 = normalizedX(nx1);
+                    float y1 = normalizedY(ny1);
+                    float x2 = normalizedX(nx2);
+                    float y2 = normalizedY(ny2);
+                    long dur = Math.max(80, action.optLong("duration", 350));
+                    Path p = new Path();
+                    p.moveTo(x1, y1);
+                    p.lineTo(x2, y2);
+                    b.addStroke(new GestureDescription.StrokeDescription(p, 0, dur));
+                    dispatchLoggedGesture(b.build(),
+                        String.format(Locale.US,
+                            "SWIPE norm(%.0f,%.0f)->(%.0f,%.0f) px(%.0f,%.0f)->(%.0f,%.0f)",
+                            nx1, ny1, nx2, ny2, x1, y1, x2, y2));
+                    break;
                 }
+                default:
+                    log("RUNNING", "Unsupported action: " + t);
+                    break;
             }
-        } catch (Exception e) { Log.e(TAG,"Execute: "+e.getMessage()); }
+        } catch (Exception e) {
+            log("RUNNING", "Execute error: " + e.getMessage());
+            Log.e(TAG, "Execute", e);
+        }
+    }
+
+    private void dispatchLoggedGesture(GestureDescription gesture, String description) {
+        boolean accepted = dispatchGesture(gesture,
+            new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    super.onCompleted(gestureDescription);
+                    log("RUNNING", "✓ " + description);
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    super.onCancelled(gestureDescription);
+                    log("RUNNING", "✗ Gesture cancelled: " + description);
+                }
+            },
+            mainHandler);
+
+        if (!accepted) {
+            log("RUNNING", "✗ Android rejected gesture: " + description);
+        }
+    }
+
+    private double readNumber(JSONObject object, String key, double fallback) {
+        Object value = object.opt(key);
+        if (value == null || value == JSONObject.NULL) return fallback;
+        if (value instanceof Number) return ((Number)value).doubleValue();
+        try {
+            return Double.parseDouble(String.valueOf(value).trim());
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private float normalizedX(double normalized) {
+        double n = Math.max(0.0, Math.min(1000.0, normalized));
+        return (float)(n * Math.max(0, captureWidth - 1) / 1000.0);
+    }
+
+    private float normalizedY(double normalized) {
+        double n = Math.max(0.0, Math.min(1000.0, normalized));
+        return (float)(n * Math.max(0, captureHeight - 1) / 1000.0);
     }
 
     // ── System prompt ──────────────────────────────────────────────────────────
     // Kept concise to minimize input tokens (fewer tokens = less cost)
 
-    private String buildSystemPrompt(int sw, int sh) {
+    private String buildSystemPrompt() {
         StringBuilder sb = new StringBuilder();
         sb.append(gameContext.trim());
-        sb.append("\n\n---\nOutput ONLY a single JSON object. Start with {. No text, no explanation.\nScreen: ")
-          .append(sw).append("x").append(sh);
+        sb.append("\n\n---\nReturn ONLY one JSON object. Start with { and end with }. No markdown or explanation.");
+        sb.append("\nCOORDINATE RULE: Every x/y value MUST be a JSON number from 0 to 1000, normalized to the entire screenshot:")
+          .append("\n- x=0 left edge, x=500 center, x=1000 right edge")
+          .append("\n- y=0 top edge, y=500 center, y=1000 bottom edge")
+          .append("\n- Never use screenshot pixels, device pixels, percentages, or quoted numbers.")
+          .append("\nAim near the CENTER of the visible card/button target, not its edge.");
 
-        // Minimal action format — reduces input tokens vs verbose descriptions
-        sb.append("\nActions:\n{\"action\":\"tap\",\"x\":N,\"y\":N}\n")
-          .append("{\"action\":\"swipe\",\"x1\":N,\"y1\":N,\"x2\":N,\"y2\":N,\"duration\":N}\n")
+        sb.append("\nActions:\n{\"action\":\"tap\",\"x\":500,\"y\":500}\n")
+          .append("{\"action\":\"swipe\",\"x1\":200,\"y1\":700,\"x2\":800,\"y2\":300,\"duration\":350}\n")
           .append("{\"action\":\"sequence\",\"steps\":[...]}\n")
-          .append("{\"action\":\"restart\",\"x\":N,\"y\":N}\n");
+          .append("{\"action\":\"restart\",\"x\":500,\"y\":500}\n")
+          .append("{\"action\":\"wait\",\"ms\":1000}\n");
 
         if (!actionHistory.isEmpty()) {
             sb.append("\nLast moves: ");
@@ -379,7 +459,7 @@ public class GameAgentService extends AccessibilityService {
 
         if (stuckCount >= STUCK_LIMIT) {
             sb.append("\n\n⚠️ STUCK x").append(stuckCount)
-              .append(" — game state hasn't changed. Try something DIFFERENT.");
+              .append(" — the game state has not changed. Pick a clearly different target.");
         }
 
         return sb.toString();
