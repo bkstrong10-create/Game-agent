@@ -1,31 +1,10 @@
-plugins {
-    id 'com.android.application'
-}
-
+plugins { id 'com.android.application' }
 android {
     namespace 'com.bradlee.gameagent'
     compileSdk 34
-
-    defaultConfig {
-        applicationId "com.bradlee.gameagent"
-        minSdk 30
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-    }
-
-    buildTypes {
-        debug   { minifyEnabled false }
-        release { minifyEnabled false; signingConfig signingConfigs.debug }
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
-    }
+    signingConfigs { release { storeFile file("gameagent.p12"); storePassword "android"; keyAlias "gameagent"; keyPassword "android" } }
+    defaultConfig { applicationId "com.bradlee.gameagent"; minSdk 30; targetSdk 34; versionCode 1; versionName "1.0" }
+    buildTypes { debug { minifyEnabled false }; release { minifyEnabled false; signingConfig signingConfigs.release } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_11; targetCompatibility JavaVersion.VERSION_11 }
 }
-
-dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-}
+dependencies { implementation 'androidx.appcompat:appcompat:1.6.1'; implementation 'com.squareup.okhttp3:okhttp:4.12.0' }
