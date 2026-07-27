@@ -35,9 +35,47 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String CONTEXT_MODEL = "gpt-5.6-luna";
 
+    private static final String UNDERHILL_NAME = "Underhill";
+    private static final String UNDERHILL_CONTEXT =
+        "Underhill is a kingdom-building strategy game (Rise of Kingdoms style). "
+        + "There are three main screens: City, World Map, and Battle/Rally.\n\n"
+        + "CITY SCREEN: A walled city (\"Underhill\") with a central Keep and outer "
+        + "buildings — Barracks, Academy, Workshop, Market, Farms. A number badge on a "
+        + "building is its level; a green up-arrow means it can be upgraded now. Side "
+        + "icons: Build, Army, Map (left) and Events, Chest, Mail (right). Bottom bar: "
+        + "March, Train, Build. Resource bar at top shows food, wood, stone, iron, and "
+        + "gold, plus current/max city population (Keep capacity).\n"
+        + "PRIORITY: (1) if any building shows an up-arrow and resources look sufficient, "
+        + "tap it then tap Upgrade; (2) if Train shows a red badge, open Train and queue "
+        + "troops (prefer the cheapest unit that keeps the queue full); (3) otherwise open "
+        + "Build and construct/upgrade the lowest-level building.\n\n"
+        + "WORLD MAP SCREEN (e.g. \"Ember Road\"): Resource tiles surround the stronghold — "
+        + "Wheat Fields, Orchard, Vegetable Garden, Berry Grove (food), Lumber Camp (wood), "
+        + "Stone Quarry (stone), Iron Deposit (iron). Tapping a tile opens a panel with "
+        + "Gather Rate, Gatherer Capacity, and three buttons: March, Gather, Details. Tap "
+        + "Gather to send idle troops to harvest. The March Queue panel (bottom-left) lists "
+        + "active marches with countdown timers — do not exceed the queue's max slots shown "
+        + "(e.g. 3/3); wait for a slot to free before sending another march.\n"
+        + "PRIORITY: keep every march queue slot filled by gathering the nearest un-worked "
+        + "resource tile of whichever resource is lowest in the top resource bar.\n\n"
+        + "BATTLE/RALLY SCREEN: Shown when attacking or defending a stronghold. Top shows "
+        + "the objective (e.g. \"Capture Ember Road\"). Side icons: Battle Log, Scout, "
+        + "Rally, Heal, Morale. Two army power bars compare your force to the defenders, "
+        + "with an \"Expected Victory\" timer. A Rally Battle panel may list allied armies "
+        + "converging with individual power and arrival times, plus overall Rally Size and "
+        + "Total Rally Power. Only tap Rally to join an alliance's rally already in progress; "
+        + "do not start a new attack against a stronger defender (red power bar higher than "
+        + "yours) unless explicitly told to.\n\n"
+        + "GENERAL RULES: Never spend gems, gold, or real currency in the Shop or Chance/"
+        + "gacha screens. Never tap Alliance donation, ads, or external links. Close any "
+        + "popup (X in a corner) before continuing. If a quest banner reads \"Train one "
+        + "more defender\" or similar with a progress count like \"0/1\", complete that "
+        + "specific action next. Prefer single taps near the center of a button; only drag "
+        + "when scrolling the world map.";
+
     private EditText etApiKey, etGameName, etGameContext, etDelay, etBudget;
     private Button btnStartStop, btnAccessibility, btnGenerate;
-    private Button btnSaveProfile, btnLoadProfile;
+    private Button btnSaveProfile, btnLoadProfile, btnPresetUnderhill;
     private Button btnFast, btnNormal, btnSlow;
     private TextView tvStatus, tvCost, tvLog, tvGames;
     private SharedPreferences prefs;
@@ -60,6 +98,7 @@ public class MainActivity extends AppCompatActivity {
         btnGenerate = findViewById(R.id.btnGenerate);
         btnSaveProfile = findViewById(R.id.btnSaveProfile);
         btnLoadProfile = findViewById(R.id.btnLoadProfile);
+        btnPresetUnderhill = findViewById(R.id.btnPresetUnderhill);
         btnFast = findViewById(R.id.btnFast);
         btnNormal = findViewById(R.id.btnNormal);
         btnSlow = findViewById(R.id.btnSlow);
@@ -95,6 +134,7 @@ public class MainActivity extends AppCompatActivity {
         btnGenerate.setOnClickListener(v -> generateContext());
         btnSaveProfile.setOnClickListener(v -> saveProfile());
         btnLoadProfile.setOnClickListener(v -> loadProfile());
+        btnPresetUnderhill.setOnClickListener(v -> loadUnderhillPreset());
         btnFast.setOnClickListener(v -> etDelay.setText("700"));
         btnNormal.setOnClickListener(v -> etDelay.setText("2000"));
         btnSlow.setOnClickListener(v -> etDelay.setText("4000"));
@@ -193,6 +233,16 @@ public class MainActivity extends AppCompatActivity {
             GameAgentService.budgetLimitUsd = 1.0;
         }
         GameAgentService.instance.startAgent();
+    }
+
+    private void loadUnderhillPreset() {
+        etGameName.setText(UNDERHILL_NAME);
+        etGameContext.setText(UNDERHILL_CONTEXT);
+        prefs.edit()
+            .putString("game_name", UNDERHILL_NAME)
+            .putString("game_context", UNDERHILL_CONTEXT)
+            .apply();
+        Toast.makeText(this, "Underhill preset loaded", Toast.LENGTH_SHORT).show();
     }
 
     private void generateContext() {

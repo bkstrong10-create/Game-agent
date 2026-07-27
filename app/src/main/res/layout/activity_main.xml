@@ -37,10 +37,10 @@
 
         <!-- API Key -->
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Anthropic API Key" android:textColor="#888888" android:textSize="10sp"/>
+            android:text="OpenAI API Key" android:textColor="#888888" android:textSize="10sp"/>
         <EditText android:id="@+id/etApiKey"
             android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:hint="sk-ant-..." android:inputType="textPassword"
+            android:hint="sk-..." android:inputType="textPassword"
             android:textColor="#FFFFFF" android:textColorHint="#333333"
             android:padding="10dp" android:background="#141414"
             android:layout_marginBottom="10dp"/>
@@ -97,6 +97,12 @@
                 android:layout_width="0dp" android:layout_height="38dp" android:layout_weight="1"
                 android:text="Load Profile" android:textSize="11sp" android:layout_marginStart="8dp"/>
         </LinearLayout>
+
+        <!-- Underhill preset -->
+        <Button android:id="@+id/btnPresetUnderhill"
+            android:layout_width="match_parent" android:layout_height="38dp"
+            android:text="Load Underhill Preset" android:textSize="11sp"
+            android:layout_marginBottom="12dp"/>
 
         <!-- Game Name + Generate -->
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
