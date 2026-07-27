@@ -23,4 +23,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: GameAgent-release
+          # Without this the artifact inherits the 90-day default, and APK
+          # builds on every push filled the account's 0.5GB Actions storage.
+          retention-days: 5
           path: app/build/outputs/apk/release/app-release.apk
