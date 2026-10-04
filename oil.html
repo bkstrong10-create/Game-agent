@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10161b">
+<title>Block Miner</title>
+<style>
+  :root{
+    --bg:#10161b;--panel:#182229;--panel2:#202d35;--text:#f4f7f8;
+    --muted:#aebbc4;--accent:#65d36e;--warn:#ffca58;--danger:#ff5d5d;
+    --line:#31424c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:linear-gradient(#0d1317,#182127);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  body{min-height:100dvh;padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom)}
+  .app{max-width:520px;margin:0 auto;padding:12px 0 20px}
+  h1{margin:4px 0 0;text-align:center;font-size:34px;letter-spacing:1.5px}
+  .sub{text-align:center;color:var(--muted);font-size:14px;margin:4px 0 12px}
+  .status{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;text-align:center;font-weight:700;margin-bottom:10px}
+  .status.ok{color:#92ef9a}.status.warn{color:var(--warn)}.status.bad{color:#ff8b8b}
+  button{width:100%;border:0;border-radius:14px;padding:14px 16px;font-size:17px;font-weight:800;margin:5px 0;background:#eef2f4;color:#10161b;box-shadow:0 4px 0 #aeb7bd;touch-action:manipulation}
+  button:active{transform:translateY(2px);box-shadow:0 2px 0 #aeb7bd}
+  button.secondary{background:#26363f;color:#eaf1f4;box-shadow:0 4px 0 #111a1f;border:1px solid #39505d}
+  button:disabled{opacity:.55}
+  .game{background:#0a0f12;border:1px solid var(--line);border-radius:18px;padding:10px;margin-top:10px;display:none}
+  .hud{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:4px 2px 10px;color:#dfe8ec;font-size:14px}
+  #message{font-weight:800;color:#fff}.count{color:var(--muted);white-space:nowrap}
+  .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+  .block{aspect-ratio:1;border-radius:3px;border:1px solid rgba(255,255,255,.15);position:relative;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);touch-action:manipulation;user-select:none;-webkit-user-select:none}
+  .dirt{background:
+    linear-gradient(135deg,rgba(255,255,255,.08) 0 15%,transparent 15% 65%,rgba(0,0,0,.08) 65%),
+    #8b5d34}
+  .stone{background:
+    linear-gradient(45deg,transparent 0 35%,rgba(255,255,255,.08) 35% 48%,transparent 48%),
+    #70777c}
+  .coal,.iron,.gold{background:#70777c}
+  .coal:after,.iron:after,.gold:after{content:"";position:absolute;width:13%;height:13%;border-radius:50%;left:26%;top:26%;box-shadow:20px 18px 0 currentColor}
+  .coal:after{background:#242628;color:#242628}.iron:after{background:#c48759;color:#c48759}.gold:after{background:#ffd34f;color:#ffd34f}
+  .locked{filter:brightness(.58);opacity:.85}
+  .mined{background:#151c20!important;border-color:#1e292f;box-shadow:inset 0 0 0 1px #0a0d0f;animation:pop .16s ease-out}
+  .mined:after{display:none}
+  @keyframes pop{50%{transform:scale(.86)}}
+  .tip{color:#8fa0aa;text-align:center;font-size:12px;margin-top:8px}
+  .overlay{position:fixed;inset:0;background:rgba(5,8,10,.96);z-index:10;display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
+  .overlay.show{display:flex}
+  .alertbox{max-width:520px;width:100%;border:2px solid var(--danger);background:#11181c;border-radius:20px;padding:26px 18px;box-shadow:0 0 45px rgba(255,70,70,.25)}
+  .alerttitle{font-size:31px;font-weight:1000;color:#ff6868;letter-spacing:.6px}
+  .alertmsg{font-size:21px;font-weight:800;margin:18px 0;min-height:58px}
+  .bar{height:12px;background:#263239;border-radius:99px;overflow:hidden;margin:18px 0}
+  .bar>div{height:100%;width:0;background:#ff5d5d;transition:width .5s}
+  .tiny{font-size:12px;color:#8999a2}
+  .shake{animation:shake .12s linear 7}
+  @keyframes shake{25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>BLOCK MINER</h1>
+  <div class="sub">Dig deep. Find rare stuff. Try not to cause an international incident.</div>
+
+  <div id="status" class="status warn">Controller not connected</div>
+  <button id="connect">START GAME / CONNECT</button>
+
+  <div id="game" class="game">
+    <div class="hud">
+      <div id="message">Tap an exposed block to mine</div>
+      <div id="count" class="count">Mined: 0</div>
+    </div>
+    <div id="grid" class="grid"></div>
+    <div class="tip">Mine downward. Darker blocks are still buried.</div>
+  </div>
+
+  <button id="newMine" class="secondary" style="display:none">NEW MINE</button>
+</div>
+
+<div id="overlay" class="overlay">
+  <div id="alertbox" class="alertbox">
+    <div id="alerttitle" class="alerttitle">AMERICAN OIL DETECTED</div>
+    <div id="alertmsg" class="alertmsg">Analyzing deposit...</div>
+    <div class="bar"><div id="progress"></div></div>
+    <div class="tiny">Totally legitimate government-looking screen. Definitely.</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const SERVICE = '12345678-1234-1234-1234-123456789abc';
+  const COMMAND = '87654321-4321-4321-4321-cba987654321';
+
+  const ROWS = 8, COLS = 6;
+  const types = ['dirt','stone','coal','iron','gold','oil'];
+  let grid = [], mined = [], oilR = 6, oilC = 2, minedCount = 0, prankRan = false;
+  let device = null, server = null, characteristic = null;
+
+  const $ = id => document.getElementById(id);
+  const status = $('status');
+  const game = $('game');
+  const gridEl = $('grid');
+  const connectBtn = $('connect');
+  const newMineBtn = $('newMine');
+  const msg = $('message');
+  const count = $('count');
+  const overlay = $('overlay');
+  const alertbox = $('alertbox');
+  const alerttitle = $('alerttitle');
+  const alertmsg = $('alertmsg');
+  const progress = $('progress');
+
+  function setStatus(text, kind='warn') {
+    status.textContent = text;
+    status.className = 'status ' + kind;
+  }
+
+  function rnd(n){ return Math.floor(Math.random()*n); }
+
+  function buildMine(){
+    prankRan = false; minedCount = 0;
+    grid = Array.from({length:ROWS},(_,r)=>Array.from({length:COLS},()=>{
+      if(r < 2) return 'dirt';
+      const x = rnd(100);
+      if(x < 8) return 'gold';
+      if(x < 20) return 'iron';
+      if(x < 36) return 'coal';
+      return 'stone';
+    }));
+    mined = Array.from({length:ROWS},()=>Array(COLS).fill(false));
+
+    oilR = 5 + rnd(3);
+    oilC = rnd(COLS);
+    grid[oilR][oilC] = 'oil';
+
+    msg.textContent = 'Tap an exposed block to mine';
+    count.textContent = 'Mined: 0';
+    draw();
+  }
+
+  function exposed(r,c){
+    return r === 0 || mined[r-1][c];
+  }
+
+  function draw(){
+    gridEl.innerHTML = '';
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const d = document.createElement('div');
+        const realType = grid[r][c];
+        const visibleType = realType === 'oil' ? 'stone' : realType;
+        d.className = 'block ' + visibleType;
+        if(mined[r][c]) d.className = 'block mined';
+        else if(!exposed(r,c)) d.classList.add('locked');
+        d.addEventListener('click',()=>mine(r,c));
+        gridEl.appendChild(d);
+      }
+    }
+  }
+
+  function mine(r,c){
+    if(mined[r][c]) return;
+    if(!exposed(r,c)){
+      msg.textContent = 'Mine the block above that one first.';
+      return;
+    }
+    mined[r][c] = true;
+    minedCount++;
+    count.textContent = 'Mined: ' + minedCount;
+
+    const t = grid[r][c];
+    if(t === 'oil'){
+      msg.textContent = '!!! YOU FOUND OIL !!!';
+      draw();
+      setTimeout(triggerPrank, 350);
+      return;
+    }
+
+    const words = {
+      dirt:'Just dirt. Keep going.',
+      stone:'Stone. Keep digging.',
+      coal:'Coal! Nice.',
+      iron:'Found iron.',
+      gold:'GOLD! Jackpot.'
+    };
+    msg.textContent = words[t] || 'Keep digging.';
+    draw();
+  }
+
+  async function connect(){
+    if(!('bluetooth' in navigator)){
+      setStatus('This Chrome does not support Web Bluetooth.', 'bad');
+      alert('Use Chrome on Android or a Web Bluetooth capable Chrome browser.');
+      return;
+    }
+    try{
+      setStatus('Choose the prank box in the Bluetooth window...', 'warn');
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE] }],
+        optionalServices: [SERVICE]
+      });
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE);
+      characteristic = await service.getCharacteristic(COMMAND);
+      setStatus('CONNECTED — START MINING', 'ok');
+      connectBtn.textContent = 'CONNECTED';
+      connectBtn.disabled = true;
+      game.style.display = 'block';
+      newMineBtn.style.display = 'block';
+      buildMine();
+    }catch(err){
+      console.error(err);
+      setStatus('Not connected — tap START GAME to try again.', 'bad');
+      connectBtn.disabled = false;
+    }
+  }
+
+  function onDisconnected(){
+    characteristic = null; server = null;
+    setStatus('Controller disconnected', 'bad');
+    connectBtn.textContent = 'RECONNECT';
+    connectBtn.disabled = false;
+  }
+
+  async function send(text){
+    if(!characteristic) return false;
+    const data = new TextEncoder().encode(text);
+    try{
+      if(characteristic.writeValueWithResponse){
+        await characteristic.writeValueWithResponse(data);
+      } else {
+        await characteristic.writeValue(data);
+      }
+      return true;
+    }catch(e){
+      console.error(e);
+      return false;
+    }
+  }
+
+  function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  async function triggerPrank(){
+    if(prankRan) return;
+    prankRan = true;
+    const sent = await send('OIL_FOUND');
+    if(!sent) setStatus('Oil found, but controller command failed.', 'bad');
+
+    if(navigator.vibrate) navigator.vibrate([150,80,150,80,300]);
+    overlay.classList.add('show');
+    alertbox.classList.add('shake');
+    alerttitle.textContent = 'AMERICAN OIL DETECTED';
+    alertmsg.textContent = 'Analyzing deposit...';
+    progress.style.width = '10%';
+    await sleep(1300);
+
+    alertbox.classList.remove('shake');
+    alertmsg.textContent = 'OIL CONFIRMED';
+    progress.style.width = '25%';
+    await sleep(1100);
+
+    alertmsg.textContent = 'CONTACTING FBI...';
+    progress.style.width = '42%';
+    if(navigator.vibrate) navigator.vibrate([100,100,100]);
+    await sleep(1500);
+
+    alertmsg.textContent = 'CONTACTING U.S. DEPARTMENT...';
+    progress.style.width = '60%';
+    await sleep(1600);
+
+    alertmsg.textContent = 'CONTACTING NOTCH...';
+    progress.style.width = '76%';
+    await sleep(1500);
+
+    alertmsg.textContent = 'ALERTING BLOCK GAME HEADQUARTERS...';
+    progress.style.width = '90%';
+    await sleep(1500);
+
+    alerttitle.textContent = 'LOOK OUT YOUR DOOR';
+    alertmsg.textContent = 'THEY ARE COMING.';
+    progress.style.width = '100%';
+    alertbox.classList.add('shake');
+    if(navigator.vibrate) navigator.vibrate([250,80,250,80,500]);
+    await sleep(2100);
+
+    alertbox.classList.remove('shake');
+    alerttitle.textContent = 'LOL 😂';
+    alertmsg.textContent = "JK — NOTHING HAPPENED. YOUR NETWORK IS FINE.";
+    progress.style.width = '0%';
+    await sleep(3500);
+
+    overlay.classList.remove('show');
+    msg.textContent = 'Prank complete 😂';
+  }
+
+  connectBtn.addEventListener('click', connect);
+  newMineBtn.addEventListener('click', buildMine);
+})();
+</script>
+</body>
+</html>
