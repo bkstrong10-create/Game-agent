@@ -155,7 +155,7 @@
     }
   }
 
-  function mine(r,c){
+  async function mine(r,c){
     if(mined[r][c]) return;
     if(!exposed(r,c)){
       msg.textContent = 'Mine the block above that one first.';
@@ -182,6 +182,9 @@
     };
     msg.textContent = words[t] || 'Keep digging.';
     draw();
+
+    // Mirror every mined material on the physical LCD.
+    await send('MINE_' + t.toUpperCase());
   }
 
   async function connect(){
@@ -254,25 +257,27 @@
 
     alertbox.classList.remove('shake');
     alertmsg.textContent = 'OIL CONFIRMED';
-    progress.style.width = '25%';
-    await sleep(1100);
+    progress.style.width = '18%';
+    await sleep(1000);
 
-    alertmsg.textContent = 'CONTACTING FBI...';
-    progress.style.width = '42%';
-    if(navigator.vibrate) navigator.vibrate([100,100,100]);
-    await sleep(1500);
+    const contacts = [
+      'U.S. DEPARTMENT',
+      'NOTCH',
+      'MOJANG',
+      'GOD',
+      'JESUS',
+      'THE ROCK',
+      'ROBLOX',
+      'PHYSICS',
+      'ISAAC NEWTON'
+    ];
 
-    alertmsg.textContent = 'CONTACTING U.S. DEPARTMENT...';
-    progress.style.width = '60%';
-    await sleep(1600);
-
-    alertmsg.textContent = 'CONTACTING NOTCH...';
-    progress.style.width = '76%';
-    await sleep(1500);
-
-    alertmsg.textContent = 'ALERTING BLOCK GAME HEADQUARTERS...';
-    progress.style.width = '90%';
-    await sleep(1500);
+    for(let i = 0; i < contacts.length; i++){
+      alertmsg.textContent = 'CONTACTING ' + contacts[i] + '...';
+      progress.style.width = (25 + Math.round((i + 1) * 7)) + '%';
+      if(navigator.vibrate && (i % 2 === 0)) navigator.vibrate([90,70,90]);
+      await sleep(1150);
+    }
 
     alerttitle.textContent = 'LOOK OUT YOUR DOOR';
     alertmsg.textContent = 'THEY ARE COMING.';
