@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111820">
+<title>Oil Prank Box Controller</title>
+<style>
+  :root{
+    --bg:#0e1419;--panel:#182229;--panel2:#22303a;--text:#f6f8f9;
+    --muted:#9fb0bb;--ok:#7ee787;--warn:#ffd166;--bad:#ff7b72;--line:#33434e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(#0b1014,#151e24);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;min-height:100vh;padding:14px}
+  .app{max-width:520px;margin:0 auto;padding-bottom:30px}
+  h1{text-align:center;margin:8px 0 4px;font-size:30px}
+  .sub{text-align:center;color:var(--muted);font-size:14px;margin-bottom:14px}
+  .status{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px;text-align:center;font-weight:800;margin-bottom:10px}
+  .status.ok{color:var(--ok)} .status.bad{color:var(--bad)} .status.warn{color:var(--warn)}
+  button{width:100%;border:0;border-radius:14px;padding:14px 12px;margin:5px 0;font-size:17px;font-weight:850;background:#eef2f4;color:#10161b;box-shadow:0 4px 0 #aab3b8;touch-action:manipulation}
+  button:active{transform:translateY(2px);box-shadow:0 2px 0 #aab3b8}
+  button:disabled{opacity:.5}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:12px}
+  .panel h2{font-size:19px;margin:0 0 9px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .danger{background:#ff6b6b;color:#141414;box-shadow:0 4px 0 #a83e3e}
+  .dark{background:#263640;color:#f4f7f8;box-shadow:0 4px 0 #11191e;border:1px solid #3b5260}
+  .pulse{background:#ffd166;color:#151515;box-shadow:0 4px 0 #ad8d38}
+  label{display:block;font-size:13px;color:var(--muted);margin:7px 0 4px}
+  input{width:100%;padding:13px;border-radius:12px;border:1px solid #435762;background:#10171b;color:#fff;font-size:18px;outline:none}
+  input:focus{border-color:#8cb8d1}
+  .count{font-size:12px;color:var(--muted);text-align:right;margin-top:3px}
+  .tiny{font-size:12px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>BOX CONTROLLER</h1>
+  <div class="sub">LED • buzzer • LCD</div>
+
+  <div id="status" class="status warn">Not connected</div>
+  <button id="connect">CONNECT TO OIL PRANK BOX</button>
+
+  <div class="panel">
+    <h2>LED</h2>
+    <div class="grid">
+      <button data-cmd="LED_ON">ON</button>
+      <button data-cmd="LED_OFF" class="dark">OFF</button>
+      <button data-cmd="LED_BLINK">BLINK</button>
+      <button data-cmd="LED_FLASH">FLASH</button>
+      <button data-cmd="LED_HEARTBEAT" class="pulse">HEARTBEAT</button>
+      <button data-cmd="LED_STOP" class="dark">STOP EFFECT</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>BUZZER</h2>
+    <div class="grid">
+      <button data-cmd="BUZZ_ON">BUZZ ON</button>
+      <button data-cmd="BUZZ_OFF" class="dark">BUZZ OFF</button>
+      <button data-cmd="BUZZ_PULSE">PULSE</button>
+      <button data-cmd="BUZZ_BEEP3">3 BEEPS</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>LCD MESSAGE</h2>
+
+    <label for="line1">Line 1</label>
+    <input id="line1" maxlength="16" placeholder="HELLO!" autocomplete="off">
+    <div id="count1" class="count">0 / 16</div>
+
+    <label for="line2">Line 2</label>
+    <input id="line2" maxlength="16" placeholder="TYPE ANYTHING" autocomplete="off">
+    <div id="count2" class="count">0 / 16</div>
+
+    <button id="sendLcd">SEND TO LCD</button>
+    <button data-cmd="LCD_CLEAR" class="dark">CLEAR LCD</button>
+    <div class="tiny">The LCD has 16 characters per line, so the app limits each line to 16.</div>
+  </div>
+
+  <button id="stopAll" class="danger">STOP EVERYTHING</button>
+</div>
+
+<script>
+(() => {
+  const SERVICE = '12345678-1234-1234-1234-123456789abc';
+  const COMMAND = '87654321-4321-4321-4321-cba987654321';
+
+  let device = null;
+  let characteristic = null;
+
+  const statusEl = document.getElementById('status');
+  const connectBtn = document.getElementById('connect');
+  const line1 = document.getElementById('line1');
+  const line2 = document.getElementById('line2');
+  const count1 = document.getElementById('count1');
+  const count2 = document.getElementById('count2');
+
+  function setStatus(text, kind='warn') {
+    statusEl.textContent = text;
+    statusEl.className = 'status ' + kind;
+  }
+
+  function setControlsEnabled(enabled) {
+    document.querySelectorAll('[data-cmd], #sendLcd, #stopAll').forEach(b => b.disabled = !enabled);
+  }
+
+  setControlsEnabled(false);
+
+  async function connect() {
+    if (!('bluetooth' in navigator)) {
+      setStatus('Web Bluetooth is not available in this browser.', 'bad');
+      return;
+    }
+
+    try {
+      setStatus('Choose Oil Prank Box...', 'warn');
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE] }],
+        optionalServices: [SERVICE]
+      });
+
+      device.addEventListener('gattserverdisconnected', () => {
+        characteristic = null;
+        setControlsEnabled(false);
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'RECONNECT';
+        setStatus('Disconnected', 'bad');
+      });
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE);
+      characteristic = await service.getCharacteristic(COMMAND);
+
+      setStatus('CONNECTED', 'ok');
+      connectBtn.textContent = 'CONNECTED';
+      connectBtn.disabled = true;
+      setControlsEnabled(true);
+    } catch (e) {
+      console.error(e);
+      setStatus('Connection cancelled or failed.', 'bad');
+    }
+  }
+
+  async function send(cmd) {
+    if (!characteristic) return false;
+    try {
+      const data = new TextEncoder().encode(cmd);
+      if (characteristic.writeValueWithResponse) {
+        await characteristic.writeValueWithResponse(data);
+      } else {
+        await characteristic.writeValue(data);
+      }
+      return true;
+    } catch (e) {
+      console.error(e);
+      setStatus('Command failed', 'bad');
+      return false;
+    }
+  }
+
+  connectBtn.addEventListener('click', connect);
+
+  document.querySelectorAll('[data-cmd]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await send(btn.dataset.cmd);
+    });
+  });
+
+  document.getElementById('sendLcd').addEventListener('click', async () => {
+    // Send each line separately so it stays reliable even with small BLE packet sizes.
+    await send('LCD1:' + line1.value);
+    await new Promise(r => setTimeout(r, 80));
+    await send('LCD2:' + line2.value);
+  });
+
+  document.getElementById('stopAll').addEventListener('click', async () => {
+    await send('STOP_ALL');
+  });
+
+  function updateCounts() {
+    count1.textContent = line1.value.length + ' / 16';
+    count2.textContent = line2.value.length + ' / 16';
+  }
+
+  line1.addEventListener('input', updateCounts);
+  line2.addEventListener('input', updateCounts);
+  updateCounts();
+})();
+</script>
+</body>
+</html>
