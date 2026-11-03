@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
         tvGames = findViewById(R.id.tvGames);
 
         prefs = openSecurePrefs();
+        migrateLegacyApiKey();
 
         String savedKey = prefs.getString("api_key", "");
         if (savedKey != null && savedKey.startsWith("sk-ant-")) {
@@ -128,14 +129,7 @@ public class MainActivity extends AppCompatActivity {
         handleStopIntent(intent);
     }
 
-    /**
-     * The OpenAI API key lives here, so this file is encrypted at rest with
-     * a key held in the Android Keystore (never included in app backups),
-     * rather than the plain SharedPreferences this used before. Uses a
-     * distinct file name: an old plaintext "GameAgent" prefs file from a
-     * prior install is left untouched rather than risk misreading it as
-     * encrypted data, so an upgrading user re-enters settings once.
-     */
+    /** Secure storage is mandatory: never downgrade API keys to plaintext. */
     private SharedPreferences openSecurePrefs() {
         try {
             MasterKey masterKey = new MasterKey.Builder(this)
@@ -148,10 +142,24 @@ public class MainActivity extends AppCompatActivity {
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM);
         } catch (Exception e) {
-            Toast.makeText(this,
-                "Secure storage unavailable, falling back to standard storage",
-                Toast.LENGTH_LONG).show();
-            return getSharedPreferences("GameAgentSecure", MODE_PRIVATE);
+            android.util.Log.e("GameAgent", "Secure preferences unavailable", e);
+            throw new IllegalStateException("Secure API key storage unavailable", e);
+        }
+    }
+
+    /** Remove legacy plaintext API key only after encrypted persistence succeeds. */
+    private void migrateLegacyApiKey() {
+        SharedPreferences legacy = getSharedPreferences("GameAgent", MODE_PRIVATE);
+        if (!legacy.contains("api_key")) return;
+        String legacyKey = legacy.getString("api_key", "");
+        if (legacyKey != null && !legacyKey.isEmpty() && !legacyKey.startsWith("sk-ant-")
+                && !prefs.contains("api_key")) {
+            if (!prefs.edit().putString("api_key", legacyKey).commit()) {
+                throw new IllegalStateException("Could not securely migrate API key");
+            }
+        }
+        if (!legacy.edit().remove("api_key").commit()) {
+            throw new IllegalStateException("Could not remove legacy plaintext API key");
         }
     }
 
