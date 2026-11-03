@@ -13,6 +13,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKey;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -68,7 +70,25 @@ public class MainActivity extends AppCompatActivity {
         tvLog = findViewById(R.id.tvLog);
         tvGames = findViewById(R.id.tvGames);
 
-        prefs = getSharedPreferences("GameAgent", MODE_PRIVATE);
+        try {
+            prefs = openSecurePrefs();
+            migrateLegacyApiKey();
+        } catch (IllegalStateException e) {
+            android.util.Log.e("GameAgent", "Secure storage initialization failed", e);
+            etApiKey.setText("");
+            etApiKey.setEnabled(false);
+            btnStartStop.setEnabled(false);
+            btnGenerate.setEnabled(false);
+            btnSaveProfile.setEnabled(false);
+            btnLoadProfile.setEnabled(false);
+            tvStatus.setText("Secure storage unavailable — agent disabled");
+            new AlertDialog.Builder(this)
+                .setTitle("Secure storage unavailable")
+                .setMessage("API key storage could not be opened safely. The agent is disabled. No unencrypted storage will be used.")
+                .setPositiveButton("OK", null)
+                .show();
+            return;
+        }
 
         String savedKey = prefs.getString("api_key", "");
         if (savedKey != null && savedKey.startsWith("sk-ant-")) {
@@ -124,6 +144,40 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleStopIntent(intent);
+    }
+
+    /** Secure storage is mandatory: never downgrade API keys to plaintext. */
+    private SharedPreferences openSecurePrefs() {
+        try {
+            MasterKey masterKey = new MasterKey.Builder(this)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build();
+            return EncryptedSharedPreferences.create(
+                this,
+                "GameAgentSecure",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM);
+        } catch (Exception e) {
+            android.util.Log.e("GameAgent", "Secure preferences unavailable", e);
+            throw new IllegalStateException("Secure API key storage unavailable", e);
+        }
+    }
+
+    /** Remove legacy plaintext API key only after encrypted persistence succeeds. */
+    private void migrateLegacyApiKey() {
+        SharedPreferences legacy = getSharedPreferences("GameAgent", MODE_PRIVATE);
+        if (!legacy.contains("api_key")) return;
+        String legacyKey = legacy.getString("api_key", "");
+        if (legacyKey != null && !legacyKey.isEmpty() && !legacyKey.startsWith("sk-ant-")
+                && !prefs.contains("api_key")) {
+            if (!prefs.edit().putString("api_key", legacyKey).commit()) {
+                throw new IllegalStateException("Could not securely migrate API key");
+            }
+        }
+        if (!legacy.edit().remove("api_key").commit()) {
+            throw new IllegalStateException("Could not remove legacy plaintext API key");
+        }
     }
 
     private void handleStopIntent(Intent intent) {
