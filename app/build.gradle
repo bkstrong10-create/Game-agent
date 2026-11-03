@@ -1,10 +1,34 @@
 plugins { id 'com.android.application' }
+
+// Release signing comes from the environment (CI secrets or a local-only
+// gradle.properties that is never committed), never hardcoded here.
+def releaseStoreFile = System.getenv("ANDROID_RELEASE_KEYSTORE_PATH")
+def releaseStorePassword = System.getenv("ANDROID_RELEASE_KEYSTORE_PASSWORD")
+def releaseKeyAlias = System.getenv("ANDROID_RELEASE_KEY_ALIAS") ?: "gameagent"
+def releaseKeyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD") ?: releaseStorePassword
+def hasReleaseSigning = releaseStoreFile != null && releaseStorePassword != null
+
 android {
     namespace 'com.bradlee.gameagent'
     compileSdk 34
-    signingConfigs { release { storeFile file("gameagent.p12"); storePassword "android"; keyAlias "gameagent"; keyPassword "android" } }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     defaultConfig { applicationId "com.bradlee.gameagent"; minSdk 30; targetSdk 34; versionCode 2; versionName "1.0" }
-    buildTypes { debug { minifyEnabled false }; release { minifyEnabled false; signingConfig signingConfigs.release } }
+    buildTypes {
+        debug { minifyEnabled false }
+        release {
+            minifyEnabled false
+            if (hasReleaseSigning) signingConfig signingConfigs.release
+        }
+    }
     compileOptions { sourceCompatibility JavaVersion.VERSION_11; targetCompatibility JavaVersion.VERSION_11 }
 }
-dependencies { implementation 'androidx.appcompat:appcompat:1.6.1'; implementation 'com.squareup.okhttp3:okhttp:4.12.0' }
+dependencies { implementation 'androidx.appcompat:appcompat:1.6.1'; implementation 'com.squareup.okhttp3:okhttp:4.12.0'; implementation 'androidx.security:security-crypto:1.1.0-alpha06' }

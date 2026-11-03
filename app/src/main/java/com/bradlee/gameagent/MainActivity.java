@@ -13,6 +13,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKey;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -68,7 +70,7 @@ public class MainActivity extends AppCompatActivity {
         tvLog = findViewById(R.id.tvLog);
         tvGames = findViewById(R.id.tvGames);
 
-        prefs = getSharedPreferences("GameAgent", MODE_PRIVATE);
+        prefs = openSecurePrefs();
 
         String savedKey = prefs.getString("api_key", "");
         if (savedKey != null && savedKey.startsWith("sk-ant-")) {
@@ -124,6 +126,33 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleStopIntent(intent);
+    }
+
+    /**
+     * The OpenAI API key lives here, so this file is encrypted at rest with
+     * a key held in the Android Keystore (never included in app backups),
+     * rather than the plain SharedPreferences this used before. Uses a
+     * distinct file name: an old plaintext "GameAgent" prefs file from a
+     * prior install is left untouched rather than risk misreading it as
+     * encrypted data, so an upgrading user re-enters settings once.
+     */
+    private SharedPreferences openSecurePrefs() {
+        try {
+            MasterKey masterKey = new MasterKey.Builder(this)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build();
+            return EncryptedSharedPreferences.create(
+                this,
+                "GameAgentSecure",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM);
+        } catch (Exception e) {
+            Toast.makeText(this,
+                "Secure storage unavailable, falling back to standard storage",
+                Toast.LENGTH_LONG).show();
+            return getSharedPreferences("GameAgentSecure", MODE_PRIVATE);
+        }
     }
 
     private void handleStopIntent(Intent intent) {
