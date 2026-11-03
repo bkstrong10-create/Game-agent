@@ -70,8 +70,25 @@ public class MainActivity extends AppCompatActivity {
         tvLog = findViewById(R.id.tvLog);
         tvGames = findViewById(R.id.tvGames);
 
-        prefs = openSecurePrefs();
-        migrateLegacyApiKey();
+        try {
+            prefs = openSecurePrefs();
+            migrateLegacyApiKey();
+        } catch (IllegalStateException e) {
+            android.util.Log.e("GameAgent", "Secure storage initialization failed", e);
+            etApiKey.setText("");
+            etApiKey.setEnabled(false);
+            btnStartStop.setEnabled(false);
+            btnGenerate.setEnabled(false);
+            btnSaveProfile.setEnabled(false);
+            btnLoadProfile.setEnabled(false);
+            tvStatus.setText("Secure storage unavailable — agent disabled");
+            new AlertDialog.Builder(this)
+                .setTitle("Secure storage unavailable")
+                .setMessage("API key storage could not be opened safely. The agent is disabled. No unencrypted storage will be used.")
+                .setPositiveButton("OK", null)
+                .show();
+            return;
+        }
 
         String savedKey = prefs.getString("api_key", "");
         if (savedKey != null && savedKey.startsWith("sk-ant-")) {
